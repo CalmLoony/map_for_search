@@ -1,48 +1,170 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
+
 <head>
-    <title>Собственный элемент управления</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <!--
-        Укажите свой API-ключ. Тестовый ключ НЕ БУДЕТ работать на других сайтах.
-        Получить ключ можно в Кабинете разработчика: https://developer.tech.yandex.ru/keys/
-    -->
+    <meta charset="utf-8">
+    <title>Say My Address</title>
     <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&amp;apikey=54faf9a4-831e-403e-8844-a6a2052b4925" type="text/javascript"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://yandex.st/jquery/2.2.3/jquery.min.js" type="text/javascript"></script>
-    <script src="custom_control.js" type="text/javascript"></script>
-    <style type="text/css">
-        html, body, #map {
-            width: 100%; height: 100%; padding: 0; margin: 0;
+    <script src="geolocation.js" type="text/javascript"></script>
+    <script src="geolocation_control.js" type="text/javascript"></script>
+
+    <style>
+
+        @media (max-height: 2500px) {
+            #address{
+                font-size: 50px;
+            }
+            #marker{
+                height: 150px;
+                width: 150px;
+            }
+            #centerUserLocationButton{
+                width: 150px; height: 150px;
+                border: 9px solid #229ED9;
+                top: 83%; left: 88%;
+            }
         }
 
-        .customControl {
-            background-color: #fff;
-            padding: 10px;
-            border-radius: 10px;
-            max-width: 200px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        @media (max-height: 1100px) {
+            #address{
+                font-size: 35px;
+            }
+            #marker{
+                height: 100px;
+                width: 100px;
+            }
+            #centerUserLocationButton{
+                width: 100px; height: 100px;
+                border: 6px solid #229ED9;
+                top: 81%; left: 87%;
+            }
         }
-
-	.centerMarker {
-  	    position: absolute;
-            /*url of the marker*/
-            background: url(http://maps.gstatic.com/mapfiles/markers2/marker.png) 
-                no-repeat;
-            /*center the marker*/
-            top: 50%;
-            left: 50%;
-            z-index: 1000;
-            /*fix offset when needed*/
-            margin-left: -10px;
-            margin-top: -34px;
-            /*size of the image*/
-            height: 34px;
-            width: 20px;
-            cursor: pointer;
+         @media (max-height: 700px) {
+            #address{
+                font-size: 20px;
+            }
+            #marker{
+                height: 50px;
+                width: 50px;
+            }
+            #centerUserLocationButton{
+                width: 50px; height: 50px;
+                border: 3px solid #229ED9;
+                top: 80%; left: 90%;
+            }
         }
     </style>
 </head>
+
 <body>
-<div id="map"></div>
+    <div id="map" style="height: 85vh; width: 100%; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">
+        <img id="marker" style="position: absolute; z-index: 10; top: 50%; left: 50%; transform: translate(-50%, -100%);" src="https://stepogram.shop/media/html/icon.png" alt="Marker" />
+    </div>
+    <div id='centerUserLocationButton' style="position: absolute; background-image: url('https://cdn3.iconfinder.com/data/icons/map-14/144/Map-10-1024.png'); background-size: cover; z-index: 12; transform: translate(-50%, -100%); background-color: white; border-radius: 1000px;"></div>
+    <div id="address" style="z-index: 11; top: 40%; left: 25%; background: #ffffff; padding: 10px; margin:10px; border: 3px solid #229ED9; border-radius: 10px;">...</div>
+
+    <script>
+
+        var map;
+        var marker;
+        var addressView;
+        var latitude;
+        var longitude;
+        var addressText;
+
+        ymaps.ready(init);
+
+        function init() {
+
+            map = new ymaps.Map('map', {
+                    center: [55.755814, 37.617635],
+                    zoom: 17,
+                    controls: ['geolocationControl', 'zoomControl', 'searchControl']
+                });
+
+            var centerUserLocationButton = document.getElementById('centerUserLocationButton');
+            centerUserLocationButton.addEventListener('click', function () {
+                ymaps.geolocation.get().then(function (result) {
+                    var userCoordinates = result.geoObjects.get(0).geometry.getCoordinates();
+                    map.setCenter(userCoordinates, 17);
+                });
+            });
+
+            map.controls.get('geolocationControl').options.set('position', {
+              top: 'auto',
+              left: 'auto',
+              right: 40, // Вернуть кнопку геолокации в правый нижний угол
+              bottom: 60});
+              map.controls.get('geolocationControl').options.set('size', 'large');
+
+            // Создаем элемент для отображения адреса
+            addressView = document.getElementById('address');
+            marker = document.getElementById('marker');
+
+            var newCenter = map.getCenter();
+            var coords = [newCenter[1].toPrecision(6), newCenter[0].toPrecision(6)].join(',');
+            latitude = newCenter[0]
+            longitude = newCenter[1]
+
+            getAddress(coords, function (address) {
+              addressView.textContent = address;
+              addressText = address;
+            });
+
+            // Обработчик события изменения центра карты
+            map.events.add('boundschange', function (event) {
+                // Получаем новые координаты центра карты
+                var newCenter = map.getCenter();
+                var coords = [newCenter[1].toPrecision(6), newCenter[0].toPrecision(6)].join(',');
+                latitude = newCenter[0]
+                longitude = newCenter[1]
+
+                getAddress(coords, function (address) {
+                    // Обновляем текст вьюхи с адресом
+                    addressView.textContent = address;
+                    addressText = address
+                });
+            });
+        }
+
+        function getAddress(coords, callback) {
+          var apiKey = '54faf9a4-831e-403e-8844-a6a2052b4925'; // Замените на свой API-ключ
+
+          // Формируем URL запроса к API Яндекс Геокодера
+          var apiUrl = 'https://geocode-maps.yandex.ru/1.x/?format=json&lang=ru_RU&apikey=' + apiKey + '&geocode=' + coords;
+
+          // Отправляем GET-запрос
+          fetch(apiUrl)
+              .then(response => response.json())
+              .then(data => {
+                  // Парсим ответ и извлекаем адрес
+                  var address = data.response.GeoObjectCollection.featureMember[0].GeoObject.metaDataProperty.GeocoderMetaData.AddressDetails.Country.AddressLine;
+
+                  // Вызываем callback с полученным адресом
+                  callback(address);
+              })
+              .catch(error => {
+                  // Обработка ошибки
+                  console.error('Ошибка при получении адреса:', error);
+              });
+        }
+
+        Telegram.WebApp.ready();
+        Telegram.WebApp.isExpanded = true;
+        Telegram.WebApp.isVerticalSwipesEnabled = false;
+        Telegram.WebApp.disableVerticalSwipes();
+        Telegram.WebApp.MainButton.setText('Отправить').show().onClick(function () {
+            const data = JSON.stringify({latitude: latitude, longitude: longitude, address: addressText});
+            Telegram.WebApp.sendData(data);
+            Telegram.WebApp.close();
+        });
+    </script>
+    <button type="button" class="Button U_ggDKn1 KwI4XdkC default primary" style="background-color: rgb(135, 116, 225); color: rgb(255, 255, 255);">Отправить</button>
 </body>
+<script type="text/javascript">
+    Telegram.WebApp.expand();
+</script>
+
 </html>
